@@ -10,3 +10,13 @@ export RUN_LOG="$PHOTO_ARCHIVE/LOGS/${RUN_LABEL}.log"
 export TAKEOUT_BATCH_ID="$RUN_LABEL"
 export INGEST_TOOL="dedupe-pipeline"
 export CANON_BACKUP_DEST="/Volumes/SHAFFEROTO/PHOTO_ARCHIVE_CANONICAL"
+
+export PHOTO_SCRIPTS="/Users/tedshaffer/Documents/Projects/googlePhotoArchiver"
+export PYTHONPATH="$PHOTO_SCRIPTS"
+export PHOTO_ARCHIVE="/Volumes/ShMedia/PHOTO_ARCHIVE"
+export PREFERRED_ACCOUNT="shafferFamilyPhotosTLSJR"
+export CANON="$PHOTO_ARCHIVE/CANONICAL/by-hash"
+export RUN_LABEL="$(date +%Y-%m-%d_%H_%M)__takeout_ingest"
+export ACCOUNTS_STR="shafferFamily shafferFamilyPhotosTLSJR"
+
+python3 "$PHOTO_SCRIPTS/scripts/build_run_plan.py"
