@@ -2,9 +2,15 @@ import os, csv, hashlib
 from pathlib import Path
 from collections import defaultdict
 
-PHOTO_ARCHIVE = os.environ["PHOTO_ARCHIVE"]
-ACCOUNTS = os.environ["ACCOUNTS_STR"].split()
-PREFERRED_ACCOUNT = os.environ["PREFERRED_ACCOUNT"]
+def require_env(name: str) -> str:
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"ERROR: env var {name} is required")
+    return v
+  
+PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
+ACCOUNTS = require_env("ACCOUNTS_STR").split()
+PREFERRED_ACCOUNT = require_env("PREFERRED_ACCOUNT")
 RUN_LABEL = os.environ.get("RUN_LABEL", "run")
 
 TAKEOUT_ROOT = os.path.join(PHOTO_ARCHIVE, "GOOGLE_TAKEOUT")

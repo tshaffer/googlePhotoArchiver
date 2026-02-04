@@ -1,8 +1,14 @@
 import os, csv
 from datetime import datetime
 
-PHOTO_ARCHIVE = os.environ["PHOTO_ARCHIVE"]
-CANON = os.environ["CANON"]
+def require_env(name: str) -> str:
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"ERROR: env var {name} is required")
+    return v
+  
+PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
+CANON = require_env("CANON")
 OUT = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "canonical_inventory__by-hash.csv")
 
 rows = []

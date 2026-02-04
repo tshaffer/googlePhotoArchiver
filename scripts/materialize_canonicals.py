@@ -1,7 +1,13 @@
 import os, csv, shutil
 
-PHOTO_ARCHIVE = os.environ["PHOTO_ARCHIVE"]
-CANON = os.environ["CANON"]
+def require_env(name: str) -> str:
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"ERROR: env var {name} is required")
+    return v
+  
+PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
+CANON = require_env("CANON")
 
 UNIQUE_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "dedup_plan__unique.csv")
 os.makedirs(CANON, exist_ok=True)

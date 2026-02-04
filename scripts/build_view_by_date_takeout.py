@@ -2,10 +2,16 @@ import os, json, hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 
-PHOTO_ARCHIVE = os.environ["PHOTO_ARCHIVE"]
-ACCOUNTS = os.environ["ACCOUNTS_STR"].split()
+def require_env(name: str) -> str:
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"ERROR: env var {name} is required")
+    return v
+  
+PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
+ACCOUNTS = require_env("ACCOUNTS_STR").split()
 TAKEOUT_ROOT = os.path.join(PHOTO_ARCHIVE, "GOOGLE_TAKEOUT")
-CANON = os.environ["CANON"]
+CANON = require_env("CANON")
 VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date-takeout")
 
 MEDIA_EXTS = {
