@@ -8,5 +8,6 @@ export PREFERRED_ACCOUNT="shafferFamilyPhotosTLSJR"
 export CANON="$PHOTO_ARCHIVE/CANONICAL/by-hash"
 export RUN_LABEL="$(date +%Y-%m-%d_%H_%M)__takeout_ingest"
 export ACCOUNTS_STR="shafferFamily shafferFamilyPhotosTLSJR"
+export RUN_LOG="$PHOTO_ARCHIVE/LOGS/${RUN_LABEL}.log"
 
 bash "$PHOTO_SCRIPTS/scripts/run_pipeline_core.sh"
