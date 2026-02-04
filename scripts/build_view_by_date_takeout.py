@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from lib.env import require_env, split_env
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
-ACCOUNTS = split_env("ACCOUNTS_STR")
+ACCOUNTS = split_env("ACCOUNTS_STR")  # REQUIRED (via env.py)
 
 TAKEOUT_ROOT = os.path.join(PHOTO_ARCHIVE, "GOOGLE_TAKEOUT")
 VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date-takeout")
@@ -21,8 +22,13 @@ MEDIA_EXTS = {
     ".mp4", ".mov", ".m4v", ".avi", ".3gp", ".mpg", ".mpeg", ".webm",
 }
 
+# Canonical filename pattern: <64-hex-sha256><ext>
+RX_CANON = re.compile(r"^(?P<sha>[0-9a-f]{64})(?P<ext>\.[^./\\]+)$", re.IGNORECASE)
+
+
 def should_skip(fn: str) -> bool:
     return fn.startswith("._") or fn == ".DS_Store"
+
 
 def sha256_file(path: str, chunk_size: int = 8 * 1024 * 1024) -> str:
     h = hashlib.sha256()
@@ -34,8 +40,10 @@ def sha256_file(path: str, chunk_size: int = 8 * 1024 * 1024) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 def is_media(path: str) -> bool:
     return Path(path).suffix.lower() in MEDIA_EXTS
+
 
 def parse_google_ts_seconds(js: dict):
     def get_ts(key):
@@ -48,28 +56,30 @@ def parse_google_ts_seconds(js: dict):
                 except Exception:
                     return None
         return None
+
     return get_ts("photoTakenTime") or get_ts("creationTime")
+
 
 def norm(s: str) -> str:
     return s.strip().lower()
 
-def canon_path_for_sha(sha: str):
-    for fn in os.listdir(CANON):
-        if fn.startswith("._") or fn == ".DS_Store" or fn.endswith(".json"):
-            continue
-        if fn.startswith(sha):
-            return os.path.join(CANON, fn)
-    return None
 
-canon_hashes = set()
+# Build canonical index: sha -> canonical filepath
+canon_by_sha: dict[str, str] = {}
 for fn in os.listdir(CANON):
-    if fn.startswith("._") or fn == ".DS_Store" or fn.endswith(".json"):
+    if should_skip(fn) or fn.endswith(".json"):
         continue
+    m = RX_CANON.match(fn)
+    if not m:
+        continue
+    sha = m.group("sha").lower()
     p = os.path.join(CANON, fn)
     if os.path.isfile(p):
-        sha, _ = os.path.splitext(fn)
-        canon_hashes.add(sha)
+        canon_by_sha[sha] = p
 
+canon_hashes = set(canon_by_sha.keys())
+
+# Build index of supplemental metadata JSON: (dirpath, media_filename_lower) -> timestamp
 index: dict[tuple[str, str], int] = {}
 json_scanned = 0
 
@@ -77,6 +87,7 @@ for acct in ACCOUNTS:
     base = os.path.join(TAKEOUT_ROOT, acct, "unzipped")
     if not os.path.isdir(base):
         continue
+
     for dirpath, _, filenames in os.walk(base):
         for fn in filenames:
             if should_skip(fn):
@@ -113,26 +124,25 @@ for acct in ACCOUNTS:
     base = os.path.join(TAKEOUT_ROOT, acct, "unzipped")
     if not os.path.isdir(base):
         continue
+
     for dirpath, _, filenames in os.walk(base):
         for fn in filenames:
             if should_skip(fn):
                 continue
+
             media_path = os.path.join(dirpath, fn)
             if not is_media(media_path):
                 continue
 
-            sha = sha256_file(media_path)
-            if sha not in canon_hashes:
+            sha = sha256_file(media_path).lower()
+            canon_src = canon_by_sha.get(sha)
+            if not canon_src:
                 continue
 
             key = (dirpath, norm(fn))
             ts = index.get(key)
             if ts is None:
                 no_json_match += 1
-                continue
-
-            canon_src = canon_path_for_sha(sha)
-            if not canon_src:
                 continue
 
             matched_to_json += 1
@@ -152,6 +162,7 @@ for acct in ACCOUNTS:
                 os.symlink(os.path.relpath(canon_src, dest_dir), dest)
                 created += 1
 
+print(f"Canonical items indexed (by filename hash): {len(canon_hashes):,}")
 print(f"Supplemental JSON scanned: {json_scanned:,}")
 print(f"Matched canonical items to JSON dates: {matched_to_json:,}")
 print(f"No supplemental JSON match (folder+filename): {no_json_match:,}")

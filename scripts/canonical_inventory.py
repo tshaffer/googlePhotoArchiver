@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 from datetime import datetime
 
 from lib.env import require_env
@@ -12,25 +13,38 @@ CANON = require_env("CANON")
 
 OUT = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "canonical_inventory__by-hash.csv")
 
+RX_CANON = re.compile(r"^(?P<sha>[0-9a-f]{64})(?P<ext>\.[^./\\]+)$", re.IGNORECASE)
+
+
 def should_skip(fn: str) -> bool:
     return fn.startswith("._") or fn == ".DS_Store" or fn.endswith(".json")
 
+
 rows: list[dict] = []
 generated = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+skipped_artifacts = 0
+skipped_noncanonical_names = 0
 
 for fn in os.listdir(CANON):
     if should_skip(fn):
+        skipped_artifacts += 1
         continue
+
+    m = RX_CANON.match(fn)
+    if not m:
+        skipped_noncanonical_names += 1
+        continue
+
     p = os.path.join(CANON, fn)
     if not os.path.isfile(p):
         continue
+
     st = os.stat(p)
-    sha, ext = os.path.splitext(fn)
     rows.append(
         {
             "generatedAtUtc": generated,
-            "sha256": sha,
-            "ext": ext.lower(),
+            "sha256": m.group("sha").lower(),
+            "ext": m.group("ext").lower(),
             "bytes": st.st_size,
             "mtimeEpochSec": int(st.st_mtime),
             "fileName": fn,
@@ -43,9 +57,11 @@ os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", newline="", encoding="utf-8") as f:
     w = csv.DictWriter(
         f,
-        fieldnames=["generatedAtUtc","sha256","ext","bytes","mtimeEpochSec","fileName"],
+        fieldnames=["generatedAtUtc", "sha256", "ext", "bytes", "mtimeEpochSec", "fileName"],
     )
     w.writeheader()
     w.writerows(rows)
 
 print(f"Wrote {len(rows):,} rows -> {OUT}")
+print(f"Skipped {skipped_artifacts:,} macOS/json artifacts")
+print(f"Skipped {skipped_noncanonical_names:,} non-canonical filenames (did not match sha256+ext)")

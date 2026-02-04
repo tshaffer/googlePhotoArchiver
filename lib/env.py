@@ -20,6 +20,12 @@ def optional_env(name: str, default: str = "") -> str:
     return v
 
 
-def split_env(name: str, default: str = "") -> list[str]:
-    raw = optional_env(name, default=default)
+def split_env(name: str, default: str | None = None) -> list[str]:
+    """
+    Split a whitespace-delimited env var into a list.
+
+    - If default is None (the default), the env var is REQUIRED.
+    - If default is provided, the env var becomes optional and default is used when unset/blank.
+    """
+    raw = require_env(name) if default is None else optional_env(name, default=default)
     return [x for x in raw.split() if x]

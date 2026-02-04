@@ -15,19 +15,22 @@ from lib.env import require_env, optional_env
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
 
-TAKEOUT_BATCH_ID = optional_env("TAKEOUT_BATCH_ID", optional_env("RUN_LABEL", "unknown-batch"))
+RUN_LABEL = optional_env("RUN_LABEL", "run")
+TAKEOUT_BATCH_ID = optional_env("TAKEOUT_BATCH_ID", RUN_LABEL)
 INGEST_TOOL = optional_env("INGEST_TOOL", "dedupe-pipeline")
 
-UNIQUE_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "dedup_plan__unique.csv")
-DUP_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "dedup_plan__duplicates.csv")
+UNIQUE_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", RUN_LABEL, "dedup_plan__unique.csv")
+DUP_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", RUN_LABEL, "dedup_plan__duplicates.csv")
 
 if not os.path.isfile(UNIQUE_CSV):
     raise SystemExit(f"ERROR: expected manifest not found: {UNIQUE_CSV}")
 
 PHOTO_URL_RX = re.compile(r"/photo/([^/?#]+)")
 
+
 def now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
 
 def find_takeout_metadata_json(media_abs_path: str) -> Optional[str]:
     p = Path(media_abs_path)
@@ -41,6 +44,7 @@ def find_takeout_metadata_json(media_abs_path: str) -> Optional[str]:
     if os.path.isfile(cand3):
         return cand3
     return None
+
 
 def deep_find_first_string_key(obj: Any, keys: set[str]) -> Optional[str]:
     if isinstance(obj, dict):
@@ -57,6 +61,7 @@ def deep_find_first_string_key(obj: Any, keys: set[str]) -> Optional[str]:
                 return found
     return None
 
+
 def extract_google_photo_ids(js: dict) -> list[str]:
     ids: set[str] = set()
     url = js.get("url")
@@ -64,11 +69,14 @@ def extract_google_photo_ids(js: dict) -> list[str]:
         m = PHOTO_URL_RX.search(url)
         if m:
             ids.add(m.group(1))
+
     for key in ("photoId", "mediaId", "googlePhotoId", "id"):
         v = deep_find_first_string_key(js, {key})
         if v and len(v) >= 10 and "http" not in v:
             ids.add(v)
+
     return sorted(ids)
+
 
 def extract_people(js: dict) -> list[str]:
     people: list[str] = []
@@ -80,6 +88,7 @@ def extract_people(js: dict) -> list[str]:
                 if isinstance(name, str) and name.strip():
                     people.append(name.strip())
     return sorted(set(people))
+
 
 def extract_geo(js: dict) -> Optional[dict]:
     g = js.get("geoData")
@@ -93,11 +102,14 @@ def extract_geo(js: dict) -> Optional[dict]:
         return out
     return None
 
+
 def canonical_media_path(sha: str, ext: str) -> str:
     return os.path.join(CANON, f"{sha}{ext}")
 
+
 def sidecar_path(sha: str, ext: str) -> str:
     return os.path.join(CANON, f"{sha}{ext}.shafferography.json")
+
 
 unique_by_sha: dict[str, dict] = {}
 with open(UNIQUE_CSV, newline="", encoding="utf-8") as f:
@@ -106,8 +118,10 @@ with open(UNIQUE_CSV, newline="", encoding="utf-8") as f:
 
 occurrences: dict[str, list[dict]] = defaultdict(list)
 
+
 def add_occ(row: dict) -> None:
     occurrences[row["sha256"]].append(row)
+
 
 with open(UNIQUE_CSV, newline="", encoding="utf-8") as f:
     for row in csv.DictReader(f):
@@ -126,6 +140,8 @@ for sha, uniq in unique_by_sha.items():
     ext = (uniq.get("ext") or "").strip().lower()
     if not ext:
         continue
+    if not ext.startswith("."):
+        ext = "." + ext
 
     canon_media = canonical_media_path(sha, ext)
     if not os.path.isfile(canon_media):
@@ -214,6 +230,7 @@ for sha, uniq in unique_by_sha.items():
         out.write("\n")
     written += 1
 
+print(f"Run label: {RUN_LABEL}")
 print(f"Sidecars written: {written:,}")
 print(f"Skipped (missing canonical media): {skipped_missing_media:,}")
 print(f"Canonicals with no metadata JSON found: {missing_json:,}")
