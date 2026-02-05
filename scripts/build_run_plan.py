@@ -9,6 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from lib.env import require_env, optional_env, split_env
+from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
@@ -50,10 +51,6 @@ def sha256_file(path: str, chunk_size: int = 8 * 1024 * 1024) -> str:
     return h.hexdigest()
 
 
-def should_skip_filename(fn: str) -> bool:
-    return fn.startswith("._") or fn == ".DS_Store"
-
-
 if not ACCOUNTS:
     raise SystemExit("ERROR: ACCOUNTS_STR resolved to zero accounts")
 
@@ -69,7 +66,7 @@ if not os.path.isdir(CANON):
     raise SystemExit(f"ERROR: CANON directory does not exist: {CANON}")
 
 for fn in os.listdir(CANON):
-    if should_skip_filename(fn) or fn.endswith(".json"):
+    if should_skip_filename(fn) or is_shafferography_sidecar(fn):
         continue
     m = RX_CANON.match(fn)
     if not m:

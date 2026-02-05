@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 
 from lib.env import require_env
+from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
@@ -16,18 +17,18 @@ OUT = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "canonical_inventory__by-hash.csv
 RX_CANON = re.compile(r"^(?P<sha>[0-9a-f]{64})(?P<ext>\.[^./\\]+)$", re.IGNORECASE)
 
 
-def should_skip(fn: str) -> bool:
-    return fn.startswith("._") or fn == ".DS_Store" or fn.endswith(".json")
-
-
 rows: list[dict] = []
 generated = datetime.utcnow().isoformat(timespec="seconds") + "Z"
 skipped_artifacts = 0
+skipped_sidecars = 0
 skipped_noncanonical_names = 0
 
 for fn in os.listdir(CANON):
-    if should_skip(fn):
+    if should_skip_filename(fn):
         skipped_artifacts += 1
+        continue
+    if is_shafferography_sidecar(fn):
+        skipped_sidecars += 1
         continue
 
     m = RX_CANON.match(fn)
@@ -63,5 +64,7 @@ with open(OUT, "w", newline="", encoding="utf-8") as f:
     w.writerows(rows)
 
 print(f"Wrote {len(rows):,} rows -> {OUT}")
-print(f"Skipped {skipped_artifacts:,} macOS/json artifacts")
+print("Inventory mode: media-only (excluding .shafferography.json sidecars)")
+print(f"Skipped {skipped_artifacts:,} macOS artifacts")
+print(f"Skipped {skipped_sidecars:,} sidecars")
 print(f"Skipped {skipped_noncanonical_names:,} non-canonical filenames (did not match sha256+ext)")

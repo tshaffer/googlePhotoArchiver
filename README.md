@@ -144,6 +144,7 @@ python3 "$PHOTO_SCRIPTS/scripts/canonical_inventory.py"         | tee -a "$RUN_L
   - unzip folder: `GOOGLE_TAKEOUT/<account>/unzipped/<zip-stem>/...`
 - Scripts must never assume a single takeout root folder.
 - All writes to MANIFESTS should be run-isolated under `MANIFESTS/runs/<RUN_LABEL>/`.
+- Canonical directory must not contain AppleDouble `._*` files or `.DS_Store`; pipeline cleanup removes them and tripwires fail if they reappear.
 
 ---
 

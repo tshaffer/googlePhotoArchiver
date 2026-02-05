@@ -6,6 +6,7 @@ import re
 import subprocess
 
 from lib.env import require_env
+from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
@@ -15,15 +16,12 @@ os.makedirs(VIEW_ROOT, exist_ok=True)
 
 rx = re.compile(r"^(\d{4}):(\d{2}):(\d{2})\b")
 
-def should_skip(fn: str) -> bool:
-    return fn.startswith("._") or fn == ".DS_Store" or fn.endswith(".json")
-
 created = 0
 no_exif = 0
 skipped = 0
 
 for fn in os.listdir(CANON):
-    if should_skip(fn):
+    if should_skip_filename(fn) or is_shafferography_sidecar(fn):
         skipped += 1
         continue
 

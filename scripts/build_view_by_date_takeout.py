@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from lib.env import require_env, split_env
+from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
@@ -24,10 +25,6 @@ MEDIA_EXTS = {
 
 # Canonical filename pattern: <64-hex-sha256><ext>
 RX_CANON = re.compile(r"^(?P<sha>[0-9a-f]{64})(?P<ext>\.[^./\\]+)$", re.IGNORECASE)
-
-
-def should_skip(fn: str) -> bool:
-    return fn.startswith("._") or fn == ".DS_Store"
 
 
 def sha256_file(path: str, chunk_size: int = 8 * 1024 * 1024) -> str:
@@ -67,7 +64,7 @@ def norm(s: str) -> str:
 # Build canonical index: sha -> canonical filepath
 canon_by_sha: dict[str, str] = {}
 for fn in os.listdir(CANON):
-    if should_skip(fn) or fn.endswith(".json"):
+    if should_skip_filename(fn) or is_shafferography_sidecar(fn):
         continue
     m = RX_CANON.match(fn)
     if not m:
@@ -90,7 +87,7 @@ for acct in ACCOUNTS:
 
     for dirpath, _, filenames in os.walk(base):
         for fn in filenames:
-            if should_skip(fn):
+            if should_skip_filename(fn):
                 continue
             if not fn.lower().endswith(".supplemental-metadata.json"):
                 continue
@@ -127,7 +124,7 @@ for acct in ACCOUNTS:
 
     for dirpath, _, filenames in os.walk(base):
         for fn in filenames:
-            if should_skip(fn):
+            if should_skip_filename(fn):
                 continue
 
             media_path = os.path.join(dirpath, fn)
