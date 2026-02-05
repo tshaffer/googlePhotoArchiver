@@ -9,8 +9,10 @@ export PHOTO_SCRIPTS="/Users/tedshaffer/Documents/Projects/googlePhotoArchiver"
 export PYTHONPATH="$PHOTO_SCRIPTS"
 
 export PHOTO_ARCHIVE="/Volumes/ShMedia/PHOTO_ARCHIVE"
-export PREFERRED_ACCOUNT="shafferFamilyPhotosTLSJR"
-export ACCOUNTS_STR="shafferFamily shafferFamilyPhotosTLSJR"
+# export PREFERRED_ACCOUNT="shafferFamilyPhotosTLSJR"
+# export ACCOUNTS_STR="shafferFamily shafferFamilyPhotosTLSJR"
+export PREFERRED_ACCOUNT="shafferFamily"
+export ACCOUNTS_STR="shafferFamily"
 
 # Where canonicals live (your pipeline uses this)
 export CANON="$PHOTO_ARCHIVE/CANONICAL/by-hash"
@@ -23,9 +25,9 @@ export RUN_LOG="$PHOTO_ARCHIVE/LOGS/${RUN_LABEL}.log"
 export TAKEOUT_BATCH_ID="${TAKEOUT_BATCH_ID:-$RUN_LABEL}"
 export INGEST_TOOL="${INGEST_TOOL:-dedupe-pipeline}"
 
-# Where ZIPs come from (per account)  <-- YOU ALREADY HAVE THESE
+# Where ZIPs come from (per account)
 export ZIP_SRC_shafferFamily="/Users/tedshaffer/Downloads/ShafferFamilyDedupeTakeouts"
-export ZIP_SRC_shafferFamilyPhotosTLSJR="/Users/tedshaffer/Downloads/ShafferFamilyPhotosTLSJRDedupeTakeouts"
+# export ZIP_SRC_shafferFamilyPhotosTLSJR="/Users/tedshaffer/Downloads/ShafferFamilyPhotosTLSJRDedupeTakeouts"
 
 # Canonical backup destination (Step 8)
 export CANON_BACKUP_DEST="/Volumes/SHAFFEROTO/PHOTO_ARCHIVE_CANONICAL"
