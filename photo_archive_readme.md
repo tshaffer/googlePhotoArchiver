@@ -29,6 +29,14 @@ The current pipeline treats all Takeout archives present at run start as authori
 
 This cleanup step is **required** and is not optional in the current design.
 
+After a successful run, each processed Google Takeout ZIP is preserved under
+`GOOGLE_TAKEOUT/<account>/zips/` as part of the historical record. The same ZIP
+files must then be removed from the ZIP_SRC input directories before starting
+the next run. A Takeout ZIP should never exist in both the ZIP_SRC input
+directory and the corresponding `GOOGLE_TAKEOUT/<account>/zips/` directory at
+the same time. Only genuinely new, unprocessed Takeout ZIPs should be present
+in ZIP_SRC when a run begins.
+
 ---
 
 ## High‑level architecture

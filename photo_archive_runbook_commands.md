@@ -128,6 +128,14 @@ mv "$TAKEOUT_INPUT"/*.zip "$TAKEOUT_ARCHIVE_DIR/processed/"
 
 Failure to perform this step will cause previously processed photos to be reprocessed and may corrupt run outputs.
 
+After a successful run, each processed Google Takeout ZIP is preserved under
+`GOOGLE_TAKEOUT/<account>/zips/` as part of the historical record. The same ZIP
+files must then be removed from the ZIP_SRC input directories before starting
+the next run. A Takeout ZIP should never exist in both the ZIP_SRC input
+directory and the corresponding `GOOGLE_TAKEOUT/<account>/zips/` directory at
+the same time. Only genuinely new, unprocessed Takeout ZIPs should be present
+in ZIP_SRC when a run begins.
+
 ---
 
 ## 3) Stage Takeouts (copy ZIPs + unzip)
