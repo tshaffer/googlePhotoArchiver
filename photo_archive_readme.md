@@ -14,6 +14,23 @@ This archive is intended to be the long‑term source for applications such as *
 
 ---
 
+## Important: Google Takeout archive hygiene
+
+Before starting any new run, the Takeout input directory **must contain only new, unprocessed Google Takeout archives**.
+
+All Takeout ZIP files that were successfully processed in a prior run **must be removed or moved out of the input directory** before starting a new run.
+
+The current pipeline treats all Takeout archives present at run start as authoritative inputs for that run. Leaving previously processed Takeout archives in place will cause files to be re-enumerated and may result in:
+
+- Reprocessing of already-ingested photos
+- Duplicate or rewritten sidecar metadata
+- Incorrect inventories or manifests
+- Confusing or misleading deduplication results
+
+This cleanup step is **required** and is not optional in the current design.
+
+---
+
 ## High‑level architecture
 
 - **CANONICAL/** – immutable truth (content‑addressed by SHA‑256)

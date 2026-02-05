@@ -113,6 +113,21 @@ for acct in "${ACCOUNTS[@]}"; do
 done
 ```
 
+### 2.3 Pre-run requirement: clear previously processed Takeout archives
+
+Before executing any run commands, verify that the Takeout input directory contains **only new Google Takeout ZIP files**.
+
+If any previously processed Takeout archives from prior runs are still present, move or delete them before continuing.
+
+Example (archive old Takeouts):
+
+```bash
+mkdir -p "$TAKEOUT_ARCHIVE_DIR/processed"
+mv "$TAKEOUT_INPUT"/*.zip "$TAKEOUT_ARCHIVE_DIR/processed/"
+```
+
+Failure to perform this step will cause previously processed photos to be reprocessed and may corrupt run outputs.
+
 ---
 
 ## 3) Stage Takeouts (copy ZIPs + unzip)
