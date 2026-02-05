@@ -47,8 +47,26 @@ with open(UNIQUE_CSV, newline="", encoding="utf-8") as f:
             missing_src += 1
             continue
 
-        shutil.copy2(src, dest)
+        # Avoid copying extended attributes/resource forks into ExFAT (AppleDouble).
+        shutil.copyfile(src, dest)
         copied += 1
+
+def remove_appledouble(root: str) -> int:
+    removed = 0
+    for dirpath, _, filenames in os.walk(root):
+        for name in filenames:
+            if name.startswith("._"):
+                path = os.path.join(dirpath, name)
+                try:
+                    os.remove(path)
+                    removed += 1
+                except OSError:
+                    print(f"WARNING: failed to remove AppleDouble file: {path}")
+    return removed
+
+removed = remove_appledouble(CANON)
+if removed:
+    print(f"WARNING: removed AppleDouble files from CANON: {removed}")
 
 print(f"Run label: {RUN_LABEL}")
 print(f"Copied new canonicals: {copied:,}")
