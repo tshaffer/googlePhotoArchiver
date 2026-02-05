@@ -13,9 +13,8 @@ set -euo pipefail
 # Strongly recommended so manifests are per-run and never collide
 : "${RUN_LABEL:?required}"
 
-# Optional but useful: defaults live in the python scripts if you omit these
-# : "${TAKEOUT_BATCH_ID:?optional}"
-# : "${INGEST_TOOL:?optional}"
+# Ensure python can import lib.env without relying on caller
+export PYTHONPATH="${PYTHONPATH:-$PHOTO_SCRIPTS}"
 
 python3 "$PHOTO_SCRIPTS/scripts/build_run_plan.py"              | tee -a "$RUN_LOG"
 python3 "$PHOTO_SCRIPTS/scripts/materialize_canonicals.py"      | tee -a "$RUN_LOG"
