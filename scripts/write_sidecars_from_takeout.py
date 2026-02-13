@@ -103,6 +103,25 @@ def extract_geo(js: dict) -> Optional[dict]:
     return None
 
 
+def extract_taken_at_iso(js: dict) -> Optional[str]:
+    photo_taken = js.get("photoTakenTime")
+    if not isinstance(photo_taken, dict):
+        return None
+
+    ts = photo_taken.get("timestamp")
+    if isinstance(ts, str):
+        ts = ts.strip()
+    if ts is None or ts == "":
+        return None
+
+    try:
+        sec = int(ts)
+    except (ValueError, TypeError):
+        return None
+
+    return datetime.fromtimestamp(sec, tz=timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 def canonical_media_path(sha: str, ext: str) -> str:
     return os.path.join(CANON, f"{sha}{ext}")
 
@@ -202,6 +221,19 @@ for sha, uniq in unique_by_sha.items():
 
     google_ids_sorted = sorted(google_ids)
     primary_google_id = google_ids_sorted[0] if google_ids_sorted else ""
+    taken_at_iso = None
+    for occ in occs_sorted:
+        meta_path = find_takeout_metadata_json(occ.get("absPath", ""))
+        if not meta_path:
+            continue
+        try:
+            with open(meta_path, "r", encoding="utf-8") as jf:
+                js = json.load(jf)
+        except Exception:
+            continue
+        taken_at_iso = extract_taken_at_iso(js)
+        if taken_at_iso:
+            break
 
     sidecar = {
         "version": 1,
@@ -223,6 +255,9 @@ for sha, uniq in unique_by_sha.items():
         "people": sorted(people),
         "geoData": geo_choice,
     }
+    if taken_at_iso:
+        sidecar["takenAtIso"] = taken_at_iso
+        sidecar["takenAtSource"] = "google-takeout-photoTakenTime"
 
     out_path = sidecar_path(sha, ext)
     with open(out_path, "w", encoding="utf-8") as out:

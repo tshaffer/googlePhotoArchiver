@@ -22,6 +22,8 @@ Per-canonical sidecars are written to `PHOTO_ARCHIVE/CANONICAL/by-hash/*.shaffer
 | `original.metadataPath` | string | always (may be empty) | Relative path to Takeout JSON sidecar if found; empty string if not found. |
 | `people` | array of string | always (may be empty) | From Takeout `people[].name`. |
 | `geoData` | object or null | always (nullable) | From Takeout `geoData` object; `null` if missing or all values are null. |
+| `takenAtIso` | string (ISO-8601 UTC) | optional | Derived from Takeout `photoTakenTime.timestamp` (seconds since epoch). |
+| `takenAtSource` | string | optional | Literal `"google-takeout-photoTakenTime"` when `takenAtIso` is present. |
 | `geoData.latitude` | number or null | present when `geoData` is object | From `geoData.latitude`. |
 | `geoData.longitude` | number or null | present when `geoData` is object | From `geoData.longitude`. |
 | `geoData.altitude` | number or null | present when `geoData` is object | From `geoData.altitude`. |
@@ -51,7 +53,9 @@ Example taken from a real output file at:
     "metadataPath": ""
   },
   "people": [],
-  "geoData": null
+  "geoData": null,
+  "takenAtIso": "1969-01-13T08:00:00Z",
+  "takenAtSource": "google-takeout-photoTakenTime"
 }
 ```
 
