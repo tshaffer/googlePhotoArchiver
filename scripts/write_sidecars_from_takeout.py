@@ -26,6 +26,7 @@ if not os.path.isfile(UNIQUE_CSV):
     raise SystemExit(f"ERROR: expected manifest not found: {UNIQUE_CSV}")
 
 PHOTO_URL_RX = re.compile(r"/photo/([^/?#]+)")
+DUPLICATE_MEDIA_RX = re.compile(r"^(?P<stem>.+)\((?P<idx>\d+)\)(?P<ext>\.[^.]+)$")
 
 
 def now_utc_iso() -> str:
@@ -34,16 +35,54 @@ def now_utc_iso() -> str:
 
 def find_takeout_metadata_json(media_abs_path: str) -> Optional[str]:
     p = Path(media_abs_path)
-    cand1 = str(p) + ".json"
-    cand2 = str(p) + ".supplemental-metadata.json"
-    if os.path.isfile(cand1):
-        return cand1
-    if os.path.isfile(cand2):
-        return cand2
-    cand3 = str(p.with_suffix("")) + ".supplemental-metadata.json"
-    if os.path.isfile(cand3):
-        return cand3
-    return None
+    candidates: list[Path] = []
+    expected_title = p.name
+
+    # Takeout duplicate variants often look like:
+    # media: "07(1).jpg" -> metadata: "07.jpg.supplemental-metadata(1).json"
+    dup_match = DUPLICATE_MEDIA_RX.match(p.name)
+    if dup_match:
+        stem = dup_match.group("stem")
+        ext = dup_match.group("ext")
+        idx = dup_match.group("idx")
+        base_title = f"{stem}{ext}"
+        expected_title = base_title
+        candidates.append(p.with_name(f"{base_title}.supplemental-metadata({idx}).json"))
+        candidates.append(p.with_name(f"{base_title}.supplemental-metadata.json"))
+
+    # Existing lookup behavior (kept for backward compatibility)
+    candidates.append(Path(str(p) + ".json"))
+    candidates.append(Path(str(p) + ".supplemental-metadata.json"))
+    candidates.append(Path(str(p.with_suffix("")) + ".supplemental-metadata.json"))
+
+    existing: list[Path] = []
+    seen: set[str] = set()
+    for cand in candidates:
+        cand_str = str(cand)
+        if cand_str in seen:
+            continue
+        seen.add(cand_str)
+        if cand.is_file():
+            existing.append(cand)
+
+    if not existing:
+        return None
+    if len(existing) == 1:
+        return str(existing[0])
+
+    # Prefer the metadata whose title matches the intended media title
+    for cand in existing:
+        try:
+            with cand.open("r", encoding="utf-8") as f:
+                js = json.load(f)
+        except Exception:
+            continue
+        title = js.get("title")
+        if isinstance(title, str) and title == expected_title:
+            return str(cand)
+
+    # Fall back to first existing candidate if title-based disambiguation fails
+    return str(existing[0])
 
 
 def deep_find_first_string_key(obj: Any, keys: set[str]) -> Optional[str]:
