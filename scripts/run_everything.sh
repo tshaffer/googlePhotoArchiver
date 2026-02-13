@@ -26,7 +26,7 @@ export TAKEOUT_BATCH_ID="${TAKEOUT_BATCH_ID:-$RUN_LABEL}"
 export INGEST_TOOL="${INGEST_TOOL:-dedupe-pipeline}"
 
 # Where ZIPs come from (per account)
-export ZIP_SRC_shafferFamily="/Users/tedshaffer/Downloads/ShafferFamilyDedupeTakeouts"
+export ZIP_SRC_shafferFamily="/Volumes/ShMedia/Dedupe Takeouts/ShafferFamilyPhotos/ZipSrc"
 # export ZIP_SRC_shafferFamilyPhotosTLSJR="/Users/tedshaffer/Downloads/ShafferFamilyPhotosTLSJRDedupeTakeouts"
 
 # Canonical backup destination (Step 8)
