@@ -5,31 +5,31 @@ set -euo pipefail
 # 0) CONFIG (edit these for your machine)
 ###############################################################################
 
-export PHOTO_SCRIPTS="/Users/tedshaffer/Documents/Projects/googlePhotoArchiver"
-export PYTHONPATH="$PHOTO_SCRIPTS"
+export PHOTO_SCRIPTS="/Users/tedshaffer/Documents/Projects/googlePhotoArchiver" # Repo root used by run_pipeline_core.sh
+export PYTHONPATH="$PHOTO_SCRIPTS" # Ensures Python can import lib/*
 
-export PHOTO_ARCHIVE="/Volumes/ShMedia/PHOTO_ARCHIVE"
+export PHOTO_ARCHIVE="/Volumes/ShMedia/PHOTO_ARCHIVE" # Archive root for manifests, views, logs, takeout, canon
 # export PREFERRED_ACCOUNT="shafferFamilyPhotosTLSJR"
 # export ACCOUNTS_STR="shafferFamily shafferFamilyPhotosTLSJR"
-export PREFERRED_ACCOUNT="shafferFamily"
-export ACCOUNTS_STR="shafferFamily"
+export PREFERRED_ACCOUNT="shafferFamily" # Used by build_run_plan.py to choose canonical source
+export ACCOUNTS_STR="shafferFamily" # Used by build_run_plan.py / build_view_by_date_takeout.py and --all
 
 # Where canonicals live (your pipeline uses this)
-export CANON="$PHOTO_ARCHIVE/CANONICAL/by-hash"
+export CANON="$PHOTO_ARCHIVE/CANONICAL/by-hash" # Canonical store for deduped media
 
 # Run output root (each ZIP gets its own run directory)
-export RUNS_ROOT="${RUNS_ROOT:-$PHOTO_ARCHIVE/RUNS}"
+export RUNS_ROOT="${RUNS_ROOT:-$PHOTO_ARCHIVE/RUNS}" # Per-zip run output root (RUN_DIR lives here)
 
 # Takeout batch/provenance defaults (used by write_sidecars_from_takeout.py)
-export INGEST_TOOL="${INGEST_TOOL:-dedupe-pipeline}"
-USER_TAKEOUT_BATCH_ID="${TAKEOUT_BATCH_ID:-}"
+export INGEST_TOOL="${INGEST_TOOL:-dedupe-pipeline}" # Sidecar provenance field
+USER_TAKEOUT_BATCH_ID="${TAKEOUT_BATCH_ID:-}" # Optional override for per-run TAKEOUT_BATCH_ID
 
 # Where ZIPs come from (per account)
-export ZIP_SRC_shafferFamily="/Volumes/ShMedia/Dedupe Takeouts/ShafferFamilyPhotos/ZipSrc"
+export ZIP_SRC_shafferFamily="/Volumes/ShMedia/Dedupe Takeouts/ShafferFamilyPhotos/ZipSrc" # Used by --all to find zips
 # export ZIP_SRC_shafferFamilyPhotosTLSJR="/Users/tedshaffer/Downloads/ShafferFamilyPhotosTLSJRDedupeTakeouts"
 
 # Canonical backup destination (Step 8)
-export CANON_BACKUP_DEST="/Volumes/SHAFFEROTO/PHOTO_ARCHIVE_CANONICAL"
+export CANON_BACKUP_DEST="/Volumes/SHAFFEROTO/PHOTO_ARCHIVE_CANONICAL" # rsync target for canonical backup
 
 ###############################################################################
 # 1) HELPERS
@@ -42,6 +42,20 @@ log() {
   else
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
   fi
+}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./run_everything.sh /path/to/A.zip /path/to/B.zip ...
+  ./run_everything.sh --all
+
+Options:
+  --all              Process all ZIPs found in ZIP_SRC_* dirs (ignores args)
+
+Environment:
+  FORCE_REUNZIP_ALL=1  Same as --all
+EOF
 }
 
 require_dir() {
@@ -88,6 +102,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -*)
       echo "ERROR: unknown option: $1" >&2
+      usage >&2
       exit 1
       ;;
     *)
@@ -133,6 +148,7 @@ fi
 if [[ ${#zips[@]} -eq 0 ]]; then
   echo "ERROR: no ZIPs provided. Usage: ./run_everything.sh /path/to/A.zip /path/to/B.zip" >&2
   echo "       Or use --all / FORCE_REUNZIP_ALL=1 to process all ZIPs in ZIP_SRC_* dirs." >&2
+  usage >&2
   exit 1
 fi
 
@@ -193,6 +209,11 @@ for zip_path in "${zips[@]}"; do
 
   log "Unzipping ZIP into run-scoped dir"
   unzip -oq "$zip_path" -d "$TAKEOUT_UNZIPPED_ROOT"
+
+  if [[ ! -d "$TAKEOUT_UNZIPPED_ROOT/Takeout" ]]; then
+    log "ERROR: unzip result missing Takeout/ directory: $TAKEOUT_UNZIPPED_ROOT"
+    exit 1
+  fi
 
   log "Running pipeline core: $PHOTO_SCRIPTS/scripts/run_pipeline_core.sh"
   bash "$PHOTO_SCRIPTS/scripts/run_pipeline_core.sh" | tee -a "$RUN_LOG"
