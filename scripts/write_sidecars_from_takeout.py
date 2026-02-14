@@ -18,6 +18,7 @@ CANON = require_env("CANON")
 RUN_LABEL = optional_env("RUN_LABEL", "run")
 TAKEOUT_BATCH_ID = optional_env("TAKEOUT_BATCH_ID", RUN_LABEL)
 INGEST_TOOL = optional_env("INGEST_TOOL", "dedupe-pipeline")
+TAKEOUT_UNZIPPED_ROOT = optional_env("TAKEOUT_UNZIPPED_ROOT", "").strip()
 
 UNIQUE_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", RUN_LABEL, "dedup_plan__unique.csv")
 DUP_CSV = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", RUN_LABEL, "dedup_plan__duplicates.csv")
@@ -246,9 +247,16 @@ for sha, uniq in unique_by_sha.items():
         missing_json += 1
 
     original_filename = os.path.basename(uniq["absPath"])
-    original_takeout_path = os.path.join(
-        "GOOGLE_TAKEOUT", uniq["account"], "unzipped", uniq["relativePath"]
-    )
+    if TAKEOUT_UNZIPPED_ROOT:
+        try:
+            rel = os.path.relpath(uniq["absPath"], TAKEOUT_UNZIPPED_ROOT)
+            original_takeout_path = os.path.join("TAKEOUT_UNZIPPED_ROOT", rel)
+        except Exception:
+            original_takeout_path = uniq["absPath"]
+    else:
+        original_takeout_path = os.path.join(
+            "GOOGLE_TAKEOUT", uniq["account"], "unzipped", uniq["relativePath"]
+        )
 
     meta_abs = find_takeout_metadata_json(uniq["absPath"])
     original_meta_path = ""

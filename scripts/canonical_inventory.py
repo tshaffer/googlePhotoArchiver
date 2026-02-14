@@ -6,13 +6,18 @@ import os
 import re
 from datetime import datetime
 
-from lib.env import require_env
+from lib.env import require_env, optional_env
 from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
 
-OUT = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "canonical_inventory__by-hash.csv")
+RUN_LABEL = optional_env("RUN_LABEL", "").strip()
+
+if RUN_LABEL:
+    OUT = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", RUN_LABEL, "canonical_inventory__by-hash.csv")
+else:
+    OUT = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", "canonical_inventory__by-hash.csv")
 
 RX_CANON = re.compile(r"^(?P<sha>[0-9a-f]{64})(?P<ext>\.[^./\\]+)$", re.IGNORECASE)
 

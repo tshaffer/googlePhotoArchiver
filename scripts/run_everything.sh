@@ -17,13 +17,12 @@ export ACCOUNTS_STR="shafferFamily"
 # Where canonicals live (your pipeline uses this)
 export CANON="$PHOTO_ARCHIVE/CANONICAL/by-hash"
 
-# Run identity (used for logs + provenance)
-export RUN_LABEL="$(date +%Y-%m-%d_%H_%M)__takeout_ingest"
-export RUN_LOG="$PHOTO_ARCHIVE/LOGS/${RUN_LABEL}.log"
+# Run output root (each ZIP gets its own run directory)
+export RUNS_ROOT="${RUNS_ROOT:-$PHOTO_ARCHIVE/RUNS}"
 
 # Takeout batch/provenance defaults (used by write_sidecars_from_takeout.py)
-export TAKEOUT_BATCH_ID="${TAKEOUT_BATCH_ID:-$RUN_LABEL}"
 export INGEST_TOOL="${INGEST_TOOL:-dedupe-pipeline}"
+USER_TAKEOUT_BATCH_ID="${TAKEOUT_BATCH_ID:-}"
 
 # Where ZIPs come from (per account)
 export ZIP_SRC_shafferFamily="/Volumes/ShMedia/Dedupe Takeouts/ShafferFamilyPhotos/ZipSrc"
@@ -37,8 +36,12 @@ export CANON_BACKUP_DEST="/Volumes/SHAFFEROTO/PHOTO_ARCHIVE_CANONICAL"
 ###############################################################################
 
 log() {
-  mkdir -p "$(dirname "$RUN_LOG")"
-  echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$RUN_LOG"
+  if [[ -n "${RUN_LOG:-}" ]]; then
+    mkdir -p "$(dirname "$RUN_LOG")"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$RUN_LOG"
+  else
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
+  fi
 }
 
 require_dir() {
@@ -61,100 +64,149 @@ require_file() {
 # 2) ONE-TIME / SAFETY: create directory skeleton
 ###############################################################################
 
-log "Run label: $RUN_LABEL"
-log "PHOTO_ARCHIVE: $PHOTO_ARCHIVE"
-log "PHOTO_SCRIPTS: $PHOTO_SCRIPTS"
-log "ACCOUNTS_STR: $ACCOUNTS_STR"
-log "PREFERRED_ACCOUNT: $PREFERRED_ACCOUNT"
-log "CANON: $CANON"
-log "TAKEOUT_BATCH_ID: $TAKEOUT_BATCH_ID"
-log "INGEST_TOOL: $INGEST_TOOL"
-
-mkdir -p "$PHOTO_ARCHIVE/LOGS"
 mkdir -p "$PHOTO_ARCHIVE/GOOGLE_TAKEOUT"
 mkdir -p "$PHOTO_ARCHIVE/MANIFESTS"
+mkdir -p "$RUNS_ROOT"
 mkdir -p "$CANON"
 
-for acct in $ACCOUNTS_STR; do
-  mkdir -p "$PHOTO_ARCHIVE/GOOGLE_TAKEOUT/$acct/zips"
-  mkdir -p "$PHOTO_ARCHIVE/GOOGLE_TAKEOUT/$acct/unzipped"
+###############################################################################
+# 3) ARG PARSING: ZIP LIST OR OVERRIDE MODE
+###############################################################################
+
+force_all="${FORCE_REUNZIP_ALL:-0}"
+zips=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all)
+      force_all=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "ERROR: unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      zips+=( "$1" )
+      shift
+      ;;
+  esac
 done
 
-###############################################################################
-# 3) STAGE TAKEOUTS: copy ZIPs into archive + unzip
-###############################################################################
+if [[ $# -gt 0 ]]; then
+  zips+=( "$@" )
+fi
 
-for acct in $ACCOUNTS_STR; do
-  src_var="ZIP_SRC_${acct}"
-  src_dir="${!src_var:-}"
+if [[ "$force_all" == "1" ]]; then
+  zips=()
+  for acct in $ACCOUNTS_STR; do
+    src_var="ZIP_SRC_${acct}"
+    src_dir="${!src_var:-}"
 
-  if [[ -z "$src_dir" ]]; then
-    log "ERROR: $src_var is not set"
-    exit 1
-  fi
-  if [[ ! -d "$src_dir" ]]; then
-    log "ERROR: $src_var points to missing dir: $src_dir"
-    exit 1
-  fi
+    if [[ -z "$src_dir" ]]; then
+      echo "ERROR: $src_var is not set" >&2
+      exit 1
+    fi
+    if [[ ! -d "$src_dir" ]]; then
+      echo "ERROR: $src_var points to missing dir: $src_dir" >&2
+      exit 1
+    fi
 
-  dest_zips="$PHOTO_ARCHIVE/GOOGLE_TAKEOUT/$acct/zips"
-  dest_unz="$PHOTO_ARCHIVE/GOOGLE_TAKEOUT/$acct/unzipped"
-
-  log "Copying ZIPs for $acct from: $src_dir -> $dest_zips"
-  rsync -aAXhv --info=progress2 --exclude="._*" --exclude=".DS_Store" \
-    "$src_dir/" \
-    "$dest_zips/" \
-    | tee -a "$RUN_LOG"
-
-  log "Unzipping ZIPs for $acct into: $dest_unz"
-  shopt -s nullglob
-  zips=( "$dest_zips"/*.zip )
-  shopt -u nullglob
+    shopt -s nullglob
+    found=( "$src_dir"/*.zip )
+    shopt -u nullglob
+    if [[ ${#found[@]} -gt 0 ]]; then
+      zips+=( "${found[@]}" )
+    fi
+  done
 
   if [[ ${#zips[@]} -eq 0 ]]; then
-    log "WARNING: no ZIP files found in: $dest_zips"
-  else
-    for z in "${zips[@]}"; do
-      log "Unzip: $(basename "$z")"
-      unzip -oq "$z" -d "$dest_unz"
-    done
+    echo "ERROR: override mode enabled but no ZIP files found in configured ZIP_SRC_* dirs" >&2
+    exit 1
   fi
-done
+fi
 
-# Quick tripwire: ensure unzipped dirs exist (and are non-empty-ish)
-missing=0
-for acct in $ACCOUNTS_STR; do
-  d="$PHOTO_ARCHIVE/GOOGLE_TAKEOUT/$acct/unzipped"
-  if [[ ! -d "$d" ]]; then
-    log "ERROR: missing expected unzipped takeout dir: $d"
-    missing=1
-  fi
-done
-if [[ $missing -ne 0 ]]; then
+if [[ ${#zips[@]} -eq 0 ]]; then
+  echo "ERROR: no ZIPs provided. Usage: ./run_everything.sh /path/to/A.zip /path/to/B.zip" >&2
+  echo "       Or use --all / FORCE_REUNZIP_ALL=1 to process all ZIPs in ZIP_SRC_* dirs." >&2
   exit 1
 fi
 
+for z in "${zips[@]}"; do
+  if [[ ! -f "$z" ]]; then
+    echo "ERROR: ZIP not found: $z" >&2
+    exit 1
+  fi
+done
+
 ###############################################################################
-# 4) RUN THE PYTHON PIPELINE
+# 4) ONE RUN PER ZIP (isolated)
 ###############################################################################
 
 require_file "$PHOTO_SCRIPTS/scripts/run_pipeline_core.sh"
-log "Running pipeline core: $PHOTO_SCRIPTS/scripts/run_pipeline_core.sh"
-bash "$PHOTO_SCRIPTS/scripts/run_pipeline_core.sh" | tee -a "$RUN_LOG"
 
-###############################################################################
-# 5) STEP 8: BACK UP CANONICALS (per run)
-###############################################################################
+for zip_path in "${zips[@]}"; do
+  zip_base="$(basename "$zip_path")"
+  zip_stem="${zip_base%.*}"
+  zip_stem="${zip_stem// /_}"
+  ts="$(date +%Y-%m-%d_%H_%M_%S)"
 
-mkdir -p "$CANON_BACKUP_DEST"
-log "Backing up CANON to: $CANON_BACKUP_DEST"
+  run_label="${ts}__${zip_stem}"
+  run_dir="$RUNS_ROOT/$run_label"
+  suffix=2
+  while [[ -e "$run_dir" ]]; do
+    run_label="${ts}__${zip_stem}__${suffix}"
+    run_dir="$RUNS_ROOT/$run_label"
+    suffix=$((suffix + 1))
+  done
 
-# Exclude AppleDouble artifacts so rsync doesn't die on xattr reads
-rsync -aAXHv --info=progress2 --itemize-changes \
-  --exclude="._*" --exclude=".DS_Store" \
-  "$PHOTO_ARCHIVE/CANONICAL/" \
-  "$CANON_BACKUP_DEST/" \
-  | tee -a "$RUN_LOG"
+  export RUN_LABEL="$run_label"
+  export RUN_DIR="$run_dir"
+  export RUN_LOG="$RUN_DIR/run.log"
+  export TAKEOUT_UNZIPPED_ROOT="$RUN_DIR/unzipped"
+
+  if [[ -z "$USER_TAKEOUT_BATCH_ID" ]]; then
+    export TAKEOUT_BATCH_ID="$RUN_LABEL"
+  else
+    export TAKEOUT_BATCH_ID="$USER_TAKEOUT_BATCH_ID"
+  fi
+
+  mkdir -p "$RUN_DIR"
+  mkdir -p "$TAKEOUT_UNZIPPED_ROOT"
+
+  log "Run label: $RUN_LABEL"
+  log "RUN_DIR: $RUN_DIR"
+  log "RUN_LOG: $RUN_LOG"
+  log "ZIP: $zip_path"
+  log "TAKEOUT_UNZIPPED_ROOT: $TAKEOUT_UNZIPPED_ROOT"
+  log "PHOTO_ARCHIVE: $PHOTO_ARCHIVE"
+  log "PHOTO_SCRIPTS: $PHOTO_SCRIPTS"
+  log "ACCOUNTS_STR: $ACCOUNTS_STR"
+  log "PREFERRED_ACCOUNT: $PREFERRED_ACCOUNT"
+  log "CANON: $CANON"
+  log "TAKEOUT_BATCH_ID: $TAKEOUT_BATCH_ID"
+  log "INGEST_TOOL: $INGEST_TOOL"
+
+  log "Unzipping ZIP into run-scoped dir"
+  unzip -oq "$zip_path" -d "$TAKEOUT_UNZIPPED_ROOT"
+
+  log "Running pipeline core: $PHOTO_SCRIPTS/scripts/run_pipeline_core.sh"
+  bash "$PHOTO_SCRIPTS/scripts/run_pipeline_core.sh" | tee -a "$RUN_LOG"
+
+  log "Backing up CANON to: $CANON_BACKUP_DEST"
+  mkdir -p "$CANON_BACKUP_DEST"
+  rsync -aAXHv --info=progress2 --itemize-changes \
+    --exclude="._*" --exclude=".DS_Store" \
+    "$PHOTO_ARCHIVE/CANONICAL/" \
+    "$CANON_BACKUP_DEST/" \
+    | tee -a "$RUN_LOG"
+
+  log "RUN DONE."
+  log "Log: $RUN_LOG"
+done
 
 log "ALL DONE."
-log "Log: $RUN_LOG"

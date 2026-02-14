@@ -18,6 +18,7 @@ PREFERRED_ACCOUNT = require_env("PREFERRED_ACCOUNT")
 RUN_LABEL = optional_env("RUN_LABEL", "run")
 
 TAKEOUT_ROOT = os.path.join(PHOTO_ARCHIVE, "GOOGLE_TAKEOUT")
+TAKEOUT_UNZIPPED_ROOT = optional_env("TAKEOUT_UNZIPPED_ROOT", "").strip()
 
 # Put outputs under a per-run folder to avoid clobbering prior runs
 OUT_DIR = os.path.join(PHOTO_ARCHIVE, "MANIFESTS", RUN_LABEL)
@@ -83,8 +84,17 @@ scanned_media_files = 0
 skipped_already_in_canon = 0
 missing_unzipped: list[str] = []
 
+def takeout_base_for(acct: str) -> str:
+    if TAKEOUT_UNZIPPED_ROOT:
+        candidate = os.path.join(TAKEOUT_UNZIPPED_ROOT, acct)
+        if os.path.isdir(candidate):
+            return candidate
+        return TAKEOUT_UNZIPPED_ROOT
+    return os.path.join(TAKEOUT_ROOT, acct, "unzipped")
+
+
 for acct in ACCOUNTS:
-    base = os.path.join(TAKEOUT_ROOT, acct, "unzipped")
+    base = takeout_base_for(acct)
     if not os.path.isdir(base):
         missing_unzipped.append(base)
         continue

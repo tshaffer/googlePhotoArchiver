@@ -5,12 +5,17 @@ import os
 import re
 import subprocess
 
-from lib.env import require_env
+from lib.env import require_env, optional_env
 from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
-VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date")
+RUN_LABEL = optional_env("RUN_LABEL", "").strip()
+
+if RUN_LABEL:
+    VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date", RUN_LABEL)
+else:
+    VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date")
 
 os.makedirs(VIEW_ROOT, exist_ok=True)
 

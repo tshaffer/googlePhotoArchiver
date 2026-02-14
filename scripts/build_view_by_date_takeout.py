@@ -8,15 +8,20 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lib.env import require_env, split_env
+from lib.env import require_env, optional_env, split_env
 from lib.fs_filters import is_shafferography_sidecar, should_skip_filename
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
 ACCOUNTS = split_env("ACCOUNTS_STR")  # REQUIRED (via env.py)
+RUN_LABEL = optional_env("RUN_LABEL", "").strip()
 
 TAKEOUT_ROOT = os.path.join(PHOTO_ARCHIVE, "GOOGLE_TAKEOUT")
-VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date-takeout")
+TAKEOUT_UNZIPPED_ROOT = optional_env("TAKEOUT_UNZIPPED_ROOT", "").strip()
+if RUN_LABEL:
+    VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date-takeout", RUN_LABEL)
+else:
+    VIEW_ROOT = os.path.join(PHOTO_ARCHIVE, "VIEWS", "by-date-takeout")
 
 MEDIA_EXTS = {
     ".jpg", ".jpeg", ".png", ".gif", ".heic", ".tif", ".tiff",
@@ -80,8 +85,17 @@ canon_hashes = set(canon_by_sha.keys())
 index: dict[tuple[str, str], int] = {}
 json_scanned = 0
 
+def takeout_base_for(acct: str) -> str:
+    if TAKEOUT_UNZIPPED_ROOT:
+        candidate = os.path.join(TAKEOUT_UNZIPPED_ROOT, acct)
+        if os.path.isdir(candidate):
+            return candidate
+        return TAKEOUT_UNZIPPED_ROOT
+    return os.path.join(TAKEOUT_ROOT, acct, "unzipped")
+
+
 for acct in ACCOUNTS:
-    base = os.path.join(TAKEOUT_ROOT, acct, "unzipped")
+    base = takeout_base_for(acct)
     if not os.path.isdir(base):
         continue
 
@@ -118,7 +132,7 @@ matched_to_json = 0
 no_json_match = 0
 
 for acct in ACCOUNTS:
-    base = os.path.join(TAKEOUT_ROOT, acct, "unzipped")
+    base = takeout_base_for(acct)
     if not os.path.isdir(base):
         continue
 
