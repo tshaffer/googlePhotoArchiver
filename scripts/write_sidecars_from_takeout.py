@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from lib.env import require_env, optional_env
+from lib.takeout_paths import takeout_unzipped_base
 
 PHOTO_ARCHIVE = require_env("PHOTO_ARCHIVE")
 CANON = require_env("CANON")
@@ -247,16 +248,17 @@ for sha, uniq in unique_by_sha.items():
         missing_json += 1
 
     original_filename = os.path.basename(uniq["absPath"])
-    if TAKEOUT_UNZIPPED_ROOT:
-        try:
-            rel = os.path.relpath(uniq["absPath"], TAKEOUT_UNZIPPED_ROOT)
+    try:
+        base = str(takeout_unzipped_base(uniq["account"]))
+        rel = os.path.relpath(uniq["absPath"], base)
+        if TAKEOUT_UNZIPPED_ROOT:
             original_takeout_path = os.path.join("TAKEOUT_UNZIPPED_ROOT", rel)
-        except Exception:
-            original_takeout_path = uniq["absPath"]
-    else:
-        original_takeout_path = os.path.join(
-            "GOOGLE_TAKEOUT", uniq["account"], "unzipped", uniq["relativePath"]
-        )
+        else:
+            original_takeout_path = os.path.join(
+                "GOOGLE_TAKEOUT", uniq["account"], "unzipped", rel
+            )
+    except Exception:
+        original_takeout_path = uniq["absPath"]
 
     meta_abs = find_takeout_metadata_json(uniq["absPath"])
     original_meta_path = ""
